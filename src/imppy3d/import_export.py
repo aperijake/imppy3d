@@ -1,6 +1,6 @@
 import numpy as np
 import cv2 as cv
-from skimage.util import img_as_ubyte, img_as_uint
+from skimage.util import img_as_ubyte, img_as_uint, img_as_float32
 from skimage import io
 import glob
 import os.path
@@ -40,8 +40,6 @@ def load_image(path_in, img_bitdepth='uint8', quiet_in=False):
             img_prop[1]: A tuple of length two that provides the number 
                 of rows and columns of pixels. 
             img_prop[2]: A string that confirms the image data type. 
-                Since load_image(...) converts all images to 'uint8', 
-                this will  always be equal to 'uint8'.
 
     ---- SIDE EFFECTS ---- 
     Function input arguments are not altered. Nothing is written to the 
@@ -98,6 +96,12 @@ def load_image(path_in, img_bitdepth='uint8', quiet_in=False):
         # Use SciKit-Image to be more robust
         img = img_as_uint(img)
         
+    elif img_bitdepth == "float32":
+        # Use SciKit-Image to convert to 32-bit float
+        if not quiet:
+            print("\nWARNING: float32 support is experimental.")
+        img = img_as_float32(img)
+
     else:
         if not quiet:
             print("\nWARNING: Unsupported bit depth detected. Defaulting to 8-bit")
@@ -176,8 +180,6 @@ def load_multipage_image(path_in, indices_in=[], bigtiff=False,\
         img_prop[1]: A tuple of length three that provides the number 
             of rows, columns, and pages of pixels. 
         img_prop[2]: A string that confirms the image data type. 
-            Since load_image(...) converts all images to 'uint8', 
-            this will  always be equal to 'uint8'.
 
     ---- SIDE EFFECTS ---- 
     Function input arguments are not altered. Nothing is written to the 
@@ -240,6 +242,10 @@ def load_multipage_image(path_in, indices_in=[], bigtiff=False,\
         # Use SciKit-Image to be more robust
         imgs = img_as_uint(imgs)
         
+    elif img_bitdepth == "float32":
+        # Use SciKit-Image to convert to 32-bit float
+        imgs = img_as_float32(imgs)
+
     else:
         if not quiet:
             print("\nWARNING: Unsupported bit depth detected. Defaulting to 8-bit")
@@ -572,18 +578,19 @@ def load_image_seq(path_in, file_name_in='', img_bitdepth_in='uint8',
     # img_prop[m][1]: A tuple of length two that provides the  
     #     number of rows and columns of pixels for the m-th image. 
     # img_prop[m][2]: A string that confirms the image data type 
-    #     for m-th image. Since load_image(...) converts all 
-    #     images to 'uint8', this will always be equal to 'uint8'.
+    #     for m-th image.
     img_props = []
     imgs = [] # Will be converted to Numpy array later
     counter = 1
+    quiet = False # Not quiet mode for the first image
     print(f"\nBeginning to import {num_imgs} images...")
     for cur_name in img_names:
         # Now actually call OpenCV routines to import the images
         # Use the defined function from above to import images in gray scale
         # and as uint8. Also, use quiet-mode (no outputs to the terminal)
         cur_img, cur_img_prop = load_image(cur_name, 
-            img_bitdepth=img_bitdepth_in, quiet_in=True)
+            img_bitdepth=img_bitdepth_in, quiet_in=quiet)
+        quiet = True # Quiet mode for the rest of the images
 
         if cur_img is None:
             print(f"\nFailed to import image: {cur_name}")
@@ -813,8 +820,7 @@ def load_image_seq_ASCII(path_in, file_name_in='', indices_in=(),
     # img_prop[m][1]: A tuple of length two that provides the  
     #     number of rows and columns of pixels for the m-th image. 
     # img_prop[m][2]: A string that confirms the image data type 
-    #     for m-th image. Since load_image(...) converts all 
-    #     images to 'uint8', this will always be equal to 'uint8'.
+    #     for m-th image.
     img_props = []
     imgs = [] # Will be converted to Numpy array later
     counter = 1

@@ -161,9 +161,9 @@ def normalize_histogram(img_in, bounds_in=(0,255), quiet_in=False):
 
     ---- INPUT ARGUMENTS ----
     [img_in]: OpenCV's numpy array for a grayscale image. It is assumed 
-        that the image is already grayscale and of type uint8. The array
-        should thus be 2D, where each value represents the intensity for
-        each corresponding pixel.
+        that the image is already grayscale and of type uint8 or float32.
+        The array should thus be 2D, where each value represents the
+        intensity for each corresponding pixel.
 
     (bounds_in): A tuple containing two integers that must range between
         0 and 255. The first integer is the intensity lower-bound, and
@@ -172,6 +172,8 @@ def normalize_histogram(img_in, bounds_in=(0,255), quiet_in=False):
         After normalization, any pixel that was originally below the 
         lower-bound will be black (i.e., 0). Conversely, any pixel that
         was originally above the upper-bound will be white (i.e., 255).
+        For float32 images, these bounds are not used, and the full
+        intensity range of the image is stretched to 0-255.
 
     quiet_in: A boolean that determiens if this function should print
         any statements to standard output. If False (default), outputs  
@@ -194,33 +196,33 @@ def normalize_histogram(img_in, bounds_in=(0,255), quiet_in=False):
     low_bound = bounds_in[0]
     up_bound = bounds_in[1]
     quiet = quiet_in
-    # ---- End Start Local Copies ----
+    # ---- End Local Copies ----
 
-    if low_bound == up_bound:
-        low_bound = 0
-        up_bound = 255
+    # Apply bounds if the image is not float32
+    if not (img.dtype == np.float32):
+        # For uint8, enforce 0-255 bounds as before
+        if low_bound == up_bound:
+            low_bound = 0
+            up_bound = 255
+        elif low_bound > up_bound:
+            temp_bound = low_bound
+            low_bound = up_bound
+            up_bound = temp_bound
+        if up_bound > 255:
+            up_bound = 255
+        if low_bound < 0:
+            low_bound = 0
 
-    elif low_bound > up_bound:
-        temp_bound = low_bound
-        low_bound = up_bound
-        up_bound = temp_bound
+        # Effectively threshold the upper and lower bounds of the image's
+        # histogram based on the provided inputs
+        img[img < low_bound] = low_bound
+        img[img > up_bound] = up_bound
 
-    if up_bound > 255:
-        up_bound = 255
-
-    if low_bound < 0:
-        low_bound = 0
-
-    # Effectively threshold the upper and lower bounds of the image's
-    # histogram based on the provided inputs
-    img[img < low_bound] = low_bound
-    img[img > up_bound] = up_bound
-
-    # This is just a new view into img, does not make an actual memory copy
-    img_new = img.copy()
+    # Allocate the output array as uint8 to ensure proper normalization
+    img_new = np.zeros(img.shape, dtype=np.uint8)
 
     # OpenCV's normalize function will do this automatically
-    cv.normalize(img, img_new, 0, 255, cv.NORM_MINMAX, cv.CV_8U)
+    cv.normalize(img, img_new, 0, 255, cv.NORM_MINMAX, dtype=cv.CV_8U)
 
     mean1_intensity = cv.mean(img_in)
     mean2_intensity = cv.mean(img_new)
