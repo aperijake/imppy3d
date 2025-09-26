@@ -8,9 +8,9 @@ import os.path
 
 def load_image(path_in, img_bitdepth='uint8', quiet_in=False):
     """ 
-    Loads an image file using OpenCV routines. Color images will be
-    converted to grayscale, and uint16 images will linearly scaled to
-    uint8. Only uint16 and uint8 image data types are supported. 
+    Loads an image file using scikit-image routines. Color images will be
+    converted to grayscale, and uint16 images will be linearly scaled to
+    uint8. Supports uint8, uint16, and float32 image data types.
     
     ---- INPUT ARGUMENTS ----
     path_in: String that contains the file path (and name and extension)
@@ -29,7 +29,7 @@ def load_image(path_in, img_bitdepth='uint8', quiet_in=False):
         correctly, this list will contain just None objects. In more 
         detail, these returned items are described below.
 
-        img: OpenCV's Mat class that describes the image data via a
+        img: NumPy array that describes the image data via a
             dense n-dimensional array of numbers. Conventional numpy 
             operations can be safely applied to img.
 
@@ -89,7 +89,7 @@ def load_image(path_in, img_bitdepth='uint8', quiet_in=False):
 
     # If uint16, convert to uint8 image data type
     if img_bitdepth == "uint8":
-        # Use SciKit-Image to be more robust; is should handle n-d arrays
+        # Use SciKit-Image to be more robust; it should handle n-d arrays
         img = img_as_ubyte(img)
         
     elif img_bitdepth == "uint16":
@@ -139,15 +139,10 @@ def load_multipage_image(path_in, indices_in=[], bigtiff=False,\
         would keep the first 100 images. Fair warning, if you provide
         invalid indices, you will get an error.
 
-    bigtiff [bool]: If False, the OpenCV multi-page TIFF function will
-        be used to import the image. This is fine for standard TIFF 
-        files. However, if the TIFF file is saved with a less 
-        conventional format/header, such as for BigTIFF or ImageJ 
-        Hyperstack formats, then this should be set to True in order to
-        use a different importer. Note, these alternative TIFF formats
-        should be used anytime the TIFF file is larger than 4 GB. When
-        set to True, the tifffile library will be used via a plugin 
-        within the Sci-Kit Image library.
+    bigtiff [bool]: If True, uses alternative TIFF formats (e.g., BigTIFF
+        or ImageJ Hyperstack) via the tifffile plugin. If False, uses
+        standard TIFF loading. Note, these alternative formats are
+        recommended for files larger than 4 GB.
     
     img_bitdepth_in [string]: Bit depth for the reader to use. Either
         of unsigned 8-bit (uint8) or unsigned 16-bit (uint16) are nominally
@@ -165,12 +160,12 @@ def load_multipage_image(path_in, indices_in=[], bigtiff=False,\
         ascending row indices, and positive Z will be along DESCENDING
         image indices.
         
-    quiet_in [bool]: Set to true to suppress any output dialog
+    quiet_in [bool]: Set to True to suppress any output dialog
     
     --- RETURNED ---
     [img, img_prop]
 
-    img: OpenCV Mats n-d array containing images (can be operated on
+    img: NumPy n-d array containing images (can be operated on
         like a numpy array). Its shape is [num_images, num_rows, 
         num_cols].
 
@@ -235,7 +230,7 @@ def load_multipage_image(path_in, indices_in=[], bigtiff=False,\
     
     # If uint16, convert to uint8 image data type
     if img_bitdepth == "uint8":
-        # Use SciKit-Image to be more robust; is should handle n-d arrays
+        # Use SciKit-Image to be more robust; it should handle n-d arrays
         imgs = img_as_ubyte(imgs)
         
     elif img_bitdepth == "uint16":
@@ -302,7 +297,7 @@ def load_multipage_image(path_in, indices_in=[], bigtiff=False,\
     # Reverse the order of the image stack
     if flipz:
         if not quiet:
-            print(f"\nReversing the order of the image stack (i.e.," \
+            print("\nReversing the order of the image stack (i.e.," \
                 + " flipping the Z-direction)...")
         imgs = np.flip(imgs, axis=0)
 
@@ -335,7 +330,7 @@ def read_pgm(filename_in, transpose=False, ASCII=True):
     "filename_in", is a string path to the ASCII image file that will be
      imported. The returned image is a Numpy 2D matrix with data type
      UINT8 (i.e., grayscale 0 - 255). Inputs and outputs are similar in
-     style to the above function, load_image(...). Note, to ready 
+     style to the above function, load_image(...).
     """
 
     # Force a local copy of this string
@@ -390,14 +385,15 @@ def read_pgm(filename_in, transpose=False, ASCII=True):
     
     return (img1, img1_shape)
 
+
 def load_image_seq(path_in, file_name_in='', img_bitdepth_in='uint8', 
     indices_in=(), flipz=False):
     """
     Loads an image sequence into memory in a single batch operation.
     This is done by repeatedly using load_image(...). Hence, the list
-    of returned images will be grayscale and of type uint8. It is 
-    assumed all of the images are in the same directory. Images are 
-    sorted in ascending order (alphabetical).
+    of returned images will be grayscale and in the specified bit depth
+    (default uint8). It is assumed all of the images are in the same
+    directory. Images are sorted in ascending order (alphabetical).
 
     ---- INPUT ARGUMENTS ---- 
     path_in: String that contains the directory path.
@@ -411,9 +407,9 @@ def load_image_seq(path_in, file_name_in='', img_bitdepth_in='uint8',
         in the directory will be imported.
 
     img_bitdepth_in [string]: Bit depth for the reader to use. Either
-        of unsigned 8-bit (uint8) or unsigned 16-bit (uint16) are
-        nominally supported. 8-bit is the default (and what the rest of
-        the codes currently expect).
+        of unsigned 8-bit (uint8), unsigned 16-bit (uint16), or 32-bit
+        float (float32) are nominally supported. 8-bit is the default
+        (and what the rest of the codes currently expect).
 
     indices_in: An optional tuple of either length 1 or length 2. If 
         length 1, then it should contain a positive integer 
@@ -443,9 +439,9 @@ def load_image_seq(path_in, file_name_in='', img_bitdepth_in='uint8',
         [imgs]: A 3D Numpy array that contains OpenCV's Mat class  
             objects, which are 2D Numpy arrays in of themselves. 
             Conventional Numpy operations can be safely applied to each
-            entry of imgs. Images are converted to grayscale and uint8
-            automatically. The shape of imgs will be (num_images,
-            num_rows, num_cols).
+            entry of imgs. Images are converted to grayscale in the
+            specified bit depth (default uint8). The shape of imgs will
+            be (num_images, num_rows, num_cols).
 
         [img_names]: A list of strings that describe the file paths used
             to import every image. 
@@ -615,7 +611,7 @@ def load_image_seq(path_in, file_name_in='', img_bitdepth_in='uint8',
         cur_shape = cur_img_prop[1]
 
         if cur_shape != first_img_shape:
-            print(f"\nWARNING! Not all imported images are of the same shape")
+            print("\nWARNING! Not all imported images are of the same shape")
             print(f"\nFirst image shape: {first_img_shape}")
             print(f"\nImage shape of {img_names[cur_index]}: {cur_shape}")
 
@@ -626,7 +622,7 @@ def load_image_seq(path_in, file_name_in='', img_bitdepth_in='uint8',
 
     # Reverse the order of the image stack
     if flipz:
-        print(f"\nReversing the order of the image stack (i.e.," \
+        print("\nReversing the order of the image stack (i.e.," \
             + " flipping the Z-direction)...")
         imgs = np.flip(imgs, axis=0)
 
@@ -858,7 +854,7 @@ def load_image_seq_ASCII(path_in, file_name_in='', indices_in=(),
         cur_shape = cur_img_prop[1]
 
         if cur_shape != first_img_shape:
-            print(f"\nWARNING! Not all imported images are of the same shape")
+            print("\nWARNING! Not all imported images are of the same shape")
             print(f"\nFirst image shape: {first_img_shape}")
             print(f"\nImage shape of {img_names[cur_index]}: {cur_shape}")
 
@@ -939,7 +935,7 @@ def save_image(img_in, path_in, compression=False, quiet_in=False):
         if not (file_path.lower()).endswith(file_ext):
 
             if not quiet:
-                print(f"Detected invalid file extension. Attempting to "\
+                print("Detected invalid file extension. Attempting to "\
                 "save as a '.tif' file...")
 
             file_path = file_path + ".tif"
@@ -1116,7 +1112,7 @@ def save_multipage_image(imgs_in, path_in, bigtiff=0,\
         Selecting 1 corresponds to using BigTIFF format, and selecting
         2 corresponds to using the native ImageJ Hyperstack format.
 
-    compressions: Boolean that governs whether the image will be 
+    compression: Boolean that governs whether the image will be
         compressed via ZLib. True to compress the multi-page TIFF
         image, and False to leave it as uncompressed.
 
@@ -1177,9 +1173,9 @@ def save_multipage_image(imgs_in, path_in, bigtiff=0,\
     # note: I think this is a somewhat cleaner way to set it up.
     # P.S. I wanted some python practice so I did this - certainly wasn't
     # necessary. There might still be a better way...
-    if compression == True:
+    if compression:
         compression = 'zlib'
-    elif compression == False:
+    elif not compression:
         compression = ''
     else:
         if not quiet:
@@ -1198,7 +1194,7 @@ def save_multipage_image(imgs_in, path_in, bigtiff=0,\
     else:
         if not quiet: 
             print(f"\nWARNING: bigtiff entry '{bigtiff}' is invalid!")
-            print(f"\nDefaulting to bigtiff=0")
+            print("\nDefaulting to bigtiff=0")
         bigtiff = False
         imagej = False
 
