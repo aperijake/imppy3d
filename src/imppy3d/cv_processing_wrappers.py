@@ -153,37 +153,34 @@ def crop_img(img_in, roi_in, quiet_in=False):
     return img_crop
 
 
-def normalize_histogram(img_in, bounds_in=(0,255), quiet_in=False):
+def normalize_histogram(img_in, bounds_in=None, quiet_in=False):
     """
     Perform a linear normalization of a grayscale digital image, also
     known as histogram stretching. The minimum pixel intensity will be 
-    mapped to 0, and maximum pixel intensity to 255.
+    mapped to 0, and maximum pixel intensity to 255. The output image
+    is always of type uint8.
 
     ---- INPUT ARGUMENTS ----
-    [img_in]: OpenCV's numpy array for a grayscale image. It is assumed 
-        that the image is already grayscale and of type uint8 or float32.
-        The array should thus be 2D, where each value represents the
-        intensity for each corresponding pixel.
+    [img_in]: OpenCV's numpy array for a grayscale image. Supported dtypes
+        include uint8, uint16, and float32. The array should be 2D.
 
-    (bounds_in): A tuple containing two integers that must range between
-        0 and 255. The first integer is the intensity lower-bound, and
-        the second integer is the intensity upper-bound. These intensity
-        bounds will be used to truncate the original image's histogram.
-        After normalization, any pixel that was originally below the 
-        lower-bound will be black (i.e., 0). Conversely, any pixel that
-        was originally above the upper-bound will be white (i.e., 255).
-        For float32 images, these bounds are not used, and the full
-        intensity range of the image is stretched to 0-255.
+    (bounds_in): A tuple containing two numbers representing the lower
+        and upper bounds for histogram truncation, or None. If None,
+        defaults to the full range of the input dtype for integers
+        (no truncation) or skips truncation for floats. Bounds must be
+        within the valid range of the input image's dtype. The lower
+        bound must be less than the upper bound. These bounds truncate
+        the histogram before normalization.
 
-    quiet_in: A boolean that determiens if this function should print
+    quiet_in: A boolean that determines if this function should print
         any statements to standard output. If False (default), outputs  
         are written. Conversely, if True, outputs are suppressed. This
         is particularly useful in the event of batch processing
 
     ---- RETURNED ----
     [img_new]: Same data structure as the input, img_in. However, the 
-        returned image numpy array is stretched so that the intensity
-        values span from 0 to 255.
+        returned image numpy array is of type uint8 and is stretched
+        so that the intensity values span from 0 to 255.
 
     ---- SIDE EFFECTS ---- 
     Function input arguments are not altered. Nothing is written to the 
@@ -193,30 +190,36 @@ def normalize_histogram(img_in, bounds_in=(0,255), quiet_in=False):
 
     # ---- Start Local Copies ----
     img = img_in.copy() # Makes a proper (i.e., deep) copy
-    low_bound = bounds_in[0]
-    up_bound = bounds_in[1]
     quiet = quiet_in
     # ---- End Local Copies ----
 
-    # Apply bounds if the image is not float32
-    if not (img.dtype == np.float32):
-        # For uint8, enforce 0-255 bounds as before
-        if low_bound == up_bound:
-            low_bound = 0
-            up_bound = 255
-        elif low_bound > up_bound:
-            temp_bound = low_bound
-            low_bound = up_bound
-            up_bound = temp_bound
-        if up_bound > 255:
-            up_bound = 255
-        if low_bound < 0:
-            low_bound = 0
+    # Determine the valid range for bounds based on input dtype
+    if np.issubdtype(img.dtype, np.integer):
+        dtype_min = np.iinfo(img.dtype).min
+        dtype_max = np.iinfo(img.dtype).max
+    elif np.issubdtype(img.dtype, np.floating):
+        dtype_min = np.finfo(img.dtype).min
+        dtype_max = np.finfo(img.dtype).max
+    else:
+        raise ValueError(f"Unsupported dtype {img.dtype}; supported: integers and floats")
 
-        # Effectively threshold the upper and lower bounds of the image's
-        # histogram based on the provided inputs
-        img[img < low_bound] = low_bound
-        img[img > up_bound] = up_bound
+    # Set default bounds if None
+    if bounds_in is None:
+        low_bound = dtype_min
+        up_bound = dtype_max
+    else:
+        low_bound = bounds_in[0]
+        up_bound = bounds_in[1]
+
+    # Validate bounds relative to dtype
+    if not (dtype_min <= low_bound <= dtype_max and dtype_min <= up_bound <= dtype_max):
+        raise ValueError(f"Bounds must be within {dtype_min} to {dtype_max} for dtype {img.dtype}")
+    if low_bound >= up_bound:
+        raise ValueError("low_bound must be less than up_bound")
+
+    # Apply bounds (clip the image) - for floats with inf, this effectively skips clipping
+    img[img < low_bound] = low_bound
+    img[img > up_bound] = up_bound
 
     # Allocate the output array as uint8 to ensure proper normalization
     img_new = np.zeros(img.shape, dtype=np.uint8)
@@ -884,8 +887,3 @@ def create_blank_image(height_in, width_in, num_channels_in,
         img_blank[:,:] = img_color
 
     return img_blank
-
-
-
-
-    
